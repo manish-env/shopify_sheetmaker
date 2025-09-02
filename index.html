@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Shopify Product & Image Mapper</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { --bg:#0b0c10; --card:#15171d; --muted:#8992a1; --text:#e8eef8; --accent:#4f8cff; --ok:#19c37d; --warn:#f59e0b; }
+    body { margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; background:#0b0c10; color:var(--text); }
+    .container { max-width:1100px; margin:28px auto; padding:0 16px; }
+    h1 { font-size:24px; margin:0 0 16px; }
+    .card { background:var(--card); border:1px solid #22252e; border-radius:14px; padding:18px; margin:14px 0; }
+    .row { display:flex; gap:14px; flex-wrap:wrap; }
+    .col { flex:1 1 320px; }
+    label { font-size:12px; color:var(--muted); display:block; margin-bottom:6px; }
+    input[type=file], select, textarea, input[type=number], input[type=text] {
+      width:100%; background:#0f1117; color:var(--text); border:1px solid #262a34; border-radius:10px; padding:10px 12px;
+    }
+    textarea { min-height:120px; }
+    .btn { background:var(--accent); color:#fff; border:none; padding:10px 14px; border-radius:10px; font-weight:600; cursor:pointer; }
+    .btn.secondary { background:#2a2f3a; }
+    .btn.warn { background:var(--warn); color:#111; }
+    .btn.ok { background:var(--ok); color:#111; }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+    .stats { display:flex; gap:14px; flex-wrap:wrap; }
+    .stat { background:#0f1117; border:1px solid #262a34; border-radius:12px; padding:12px 14px; min-width:160px; }
+    .stat .k { font-size:12px; color:var(--muted); }
+    .stat .v { font-size:18px; font-weight:700; margin-top:4px; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { border-bottom:1px solid #20242f; padding:10px; font-size:13px; vertical-align:top; }
+    th { text-align:left; color:#aab4c6; position:sticky; top:0; background:var(--card); }
+    .sizes .tag { background:#0f1117; border:1px solid #2d3342; padding:2px 8px; margin:2px 6px 2px 0; border-radius:999px; display:inline-block; font-size:12px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .mapping { display:grid; grid-template-columns: 1.6fr 1fr 1.6fr; gap:8px; align-items:center; }
+    .pill { font-size:11px; color:#9fb1c9; border:1px solid #2a2f3a; display:inline-block; padding:2px 8px; border-radius:999px; }
+    .hidden { display:none; }
+    .stepper { display:flex; gap:10px; margin-bottom:12px; }
+    .step { background:#0f1117; border:1px solid #262a34; border-radius:999px; padding:6px 12px; color:#aab4c6; }
+    .step.active { border-color:var(--accent); color:#fff; }
+    .step.completed { border-color:#2e7aff; }
+    .muted { color:var(--muted); }
+    .mono { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; }
+  </style>
+  <!-- SheetJS for XLSX parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Shopify Product &amp; Image Mapper</h1>
+
+    <div class="stepper">
+      <div id="step-1" class="step active">1. Upload</div>
+      <div id="step-2" class="step">2. Preview &amp; Map</div>
+      <div id="step-3" class="step">3. Generate</div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div id="step-1-content" class="card step-content">
+      <div class="grid">
+        <div class="col">
+          <label>Products file (.xlsx recommended)</label>
+          <input id="products-file" type="file" accept=".xlsx,.xls,.csv" />
+        </div>
+        <div class="col">
+          <label>Shopify template (optional: .xlsx/.csv)</label>
+          <input id="existing-shopify-file" type="file" accept=".xlsx,.xls,.csv" />
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:12px;">
+        <div class="col">
+          <label>Image URLs file (one URL per line)</label>
+          <input id="image-urls-file" type="file" accept=".txt,.csv" />
+          <div class="muted" style="margin-top:6px;">You can also paste URLs below</div>
+        </div>
+        <div class="col">
+          <label>Or paste ImgBB/Dropbox/Cloudinary URLs (one per line)</label>
+          <textarea id="image-urls-text" placeholder="https://i.ibb.co/....jpg&#10;https://res.cloudinary.com/.../image.webp&#10;https://.../file(1).jpg"></textarea>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:12px;">
+        <button id="preview-mapping" class="btn">Preview mapping →</button>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div id="step-2-content" class="card step-content hidden">
+      <div class="stats">
+        <div class="stat"><div class="k">Total products</div><div id="total-products" class="v">0</div></div>
+        <div class="stat"><div class="k">Mapped columns</div><div id="mapped-columns" class="v">0</div></div>
+        <div class="stat"><div class="k">Size variants found</div><div id="size-variants" class="v">0</div></div>
+      </div>
+
+      <div class="row" style="margin:10px 0;">
+        <button id="auto-map-columns" class="btn secondary">Auto map columns</button>
+        <button id="clear-mappings" class="btn secondary">Clear mappings</button>
+        <div class="muted">Adjust column mappings below, then proceed.</div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <div class="muted" style="margin-bottom:6px;">Shopify columns → map to product columns</div>
+          <div id="shopify-columns"></div>
+        </div>
+        <div class="card">
+          <div class="muted" style="margin-bottom:6px;">Product sheet columns (reference)</div>
+          <div id="row-sheet-columns"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px; overflow:auto; max-height:400px;">
+        <table>
+          <thead>
+            <tr>
+              <th>SKU</th>
+              <th>Title</th>
+              <th>Color</th>
+              <th>Fabric</th>
+              <th>Category</th>
+              <th>Sizes</th>
+              <th>Images</th>
+              <th>Price</th>
+            </tr>
+          </thead>
+          <tbody id="mapped-products-table"></tbody>
+        </table>
+      </div>
+
+      <div class="row">
+        <button id="back-to-upload" class="btn secondary">← Back</button>
+        <button id="proceed-to-generate" class="btn">Proceed to generate →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div id="step-3-content" class="card step-content hidden">
+      <div class="row">
+        <div class="col">
+          <label>Product Type (Shopify “Type”)</label>
+          <input id="product-type" type="text" value="Saree" />
+        </div>
+        <div class="col">
+          <label>Compare At % (on Variant Price)</label>
+          <input id="price-increase" type="number" step="1" value="20" />
+        </div>
+        <div class="col">
+          <label>Per-size % price bump (optional)</label>
+          <input id="size-price-increase" type="number" step="1" value="0" />
+        </div>
+      </div>
+
+      <div class="stats" style="margin-top:12px;">
+        <div class="stat"><div class="k">Products loaded</div><div id="final-total-products" class="v">0</div></div>
+        <div class="stat"><div class="k">CSV rows generated</div><div id="final-csv-rows" class="v">0</div></div>
+        <div class="stat"><div class="k">Size variants</div><div id="final-size-variants" class="v">0</div></div>
+      </div>
+
+      <div class="row" style="margin-top:12px;">
+        <button id="back-to-preview" class="btn secondary">← Back</button>
+        <button id="download-shopify-csv" class="btn ok">Download Shopify CSV</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js" defer></script>
+
+</body>
+</html>
