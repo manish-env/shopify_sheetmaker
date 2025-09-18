@@ -368,9 +368,8 @@ class ShopifyProductMapper {
           // Per-row product type: prefer source, fallback to UI default
           const rowType = this.getMappedValue(row,'type') || productType;
   
-          // Strict images (only from provided Img URL list). Skip product if none.
+          // Collect images but don't skip products without images
           const images = this.collectImagesForRow(row);
-          if (!images.length) return;
   
           const price = Number(this.getMappedValue(row,'price') || 0);
           const compareAt = isFinite(price) ? Number((price * (1 + priceIncrease/100)).toFixed(2)) : "";
