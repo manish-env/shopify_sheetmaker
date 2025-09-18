@@ -359,95 +359,116 @@ class ShopifyProductMapper {
         console.warn('No explicit column mappings; relying on fallbacks.');
       }
   
-      this.mappingResults.processedProducts.forEach((row, index) => {
-        try {
-          // Title & Handle rules
-          const rawTitle = this.getMappedValue(row,'seo_title') || this.getMappedValue(row,'title') || this.getMappedValue(row,'product') || (row.sku || "");
-          const title = String(rawTitle || "").trim();
-          const handle = (title || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-          // Per-row product type: prefer source, fallback to UI default
-          const rowType = this.getMappedValue(row,'type') || productType;
-  
-          // Collect images but don't skip products without images
-          const images = this.collectImagesForRow(row);
-  
-          const price = Number(this.getMappedValue(row,'price') || 0);
-          const compareAt = isFinite(price) ? Number((price * (1 + priceIncrease/100)).toFixed(2)) : "";
-  
-          const sizes = row.sizes || [];
-          const hasSizes = sizes.length > 0;
-  
-          if (hasSizes) {
-            sizes.forEach((size, idx) => {
-              const baseSku = this.getMappedValue(row,'sku') || "";
-              const variantSku = baseSku + (size ? "-" + size : "");
-              const sizePrice = this.calculateSizePrice(price, idx, sizePriceIncrease);
-              const sizeCompareAt = isFinite(sizePrice) ? Number((sizePrice * (1 + priceIncrease/100)).toFixed(2)) : "";
-  
-              const base = {
-                Handle: handle,
-                Title: size ? `${title} - ${size}` : title,
-                SKU: variantSku,
-                "Body (HTML)": this.getMappedValue(row,'seo_body') || this.getMappedValue(row,'description') || "",
-                Vendor: this.getMappedValue(row,'vendor') || "House of Sonalii",
-                Type: rowType,
-                Tags: this.generateTags(row),
-                Published: "TRUE",
-                "Option1 Name": "Size",
-                "Option1 Value": size || "One Size",
-                "Variant SKU": variantSku,
-                "Variant Price": sizePrice || "",
-                "Variant Compare At Price": sizeCompareAt || "",
-                "Variant Inventory Qty": this.getMappedValue(row,'stock') || 0,
-                "Variant Taxable": "TRUE",
-                "Image Src": this.sanitizeImageUrl(images[0]) || "",
-                "Image Position": images.length ? 1 : "",
-                "Variant Image": this.sanitizeImageUrl(images[0]) || ""
-              };
-              this.addMetafields(base, row);
-              shopifyRows.push(base);
-            });
-          } else {
-            const sku = this.getMappedValue(row,'sku') || "";
-            const base = {
-              Handle: handle,
-              Title: title,
-              SKU: sku,
-              "Body (HTML)": this.getMappedValue(row,'seo_body') || this.getMappedValue(row,'description') || "",
-              Vendor: this.getMappedValue(row,'vendor') || "House of Sonalii",
-              Type: rowType,
-              Tags: this.generateTags(row),
-              Published: "TRUE",
-              "Option1 Name": "Title",
-              "Option1 Value": "Default Title",
-              "Variant SKU": sku,
-              "Variant Price": price || "",
-              "Variant Compare At Price": compareAt || "",
-              "Variant Inventory Qty": this.getMappedValue(row,'stock') || 0,
-              "Variant Taxable": "TRUE",
-              "Image Src": this.sanitizeImageUrl(images[0]) || "",
-              "Image Position": images.length ? 1 : "",
-              "Variant Image": this.sanitizeImageUrl(images[0]) || ""
-            };
-            this.addMetafields(base, row);
-            shopifyRows.push(base);
-          }
-  
-          // Extra images (same handle)
-          for (let i = 1; i < images.length; i++) {
-            const extra = this.sanitizeImageUrl(images[i]);
-            if (!extra) continue;
-            shopifyRows.push({
-              Handle: handle,
-              "Image Src": extra,
-              "Image Position": i + 1
-            });
-          }
-  
-        } catch (err) {
-          console.error(`Row ${index} error:`, err);
-        }
+      const usedHandles = new Set();
+
+this.mappingResults.processedProducts.forEach((row, index) => {
+  try {
+    // Title & Handle rules
+    const rawTitle = this.getMappedValue(row,'seo_title') 
+                  || this.getMappedValue(row,'title') 
+                  || this.getMappedValue(row,'product') 
+                  || (row.sku || "");
+    const title = String(rawTitle || "").trim();
+
+    let baseHandle = (title || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+    // Deduplicate handles by appending -1, -2, etc.
+    let handle = baseHandle;
+    let counter = 1;
+    while (usedHandles.has(handle)) {
+      handle = `${baseHandle}-${counter}`;
+      counter++;
+    }
+    usedHandles.add(handle);
+
+    // ---- rest of your existing logic ----
+    const rowType = this.getMappedValue(row,'type') || productType;
+    const images = this.collectImagesForRow(row);
+    const price = Number(this.getMappedValue(row,'price') || 0);
+    const compareAt = isFinite(price) 
+      ? Number((price * (1 + priceIncrease/100)).toFixed(2)) 
+      : "";
+    
+    const sizes = row.sizes || [];
+    const hasSizes = sizes.length > 0;
+
+    if (hasSizes) {
+      sizes.forEach((size, idx) => {
+        const baseSku = this.getMappedValue(row,'sku') || "";
+        const variantSku = baseSku + (size ? "-" + size : "");
+        const sizePrice = this.calculateSizePrice(price, idx, sizePriceIncrease);
+        const sizeCompareAt = isFinite(sizePrice) 
+          ? Number((sizePrice * (1 + priceIncrease/100)).toFixed(2)) 
+          : "";
+
+        const base = {
+          Handle: handle,
+          Title: size ? `${title} - ${size}` : title,
+          SKU: variantSku,
+          "Body (HTML)": this.getMappedValue(row,'seo_body') || this.getMappedValue(row,'description') || "",
+          Vendor: this.getMappedValue(row,'vendor') || "House of Sonalii",
+          Type: rowType,
+          Tags: this.generateTags(row),
+          Published: "TRUE",
+          "Option1 Name": "Size",
+          "Option1 Value": size || "One Size",
+          "Variant SKU": variantSku,
+          "Variant Price": sizePrice || "",
+          "Variant Compare At Price": sizeCompareAt || "",
+          "Variant Inventory Qty": this.getMappedValue(row,'stock') || 0,
+          "Variant Taxable": "TRUE",
+          "Image Src": this.sanitizeImageUrl(images[0]) || "",
+          "Image Position": images.length ? 1 : "",
+          "Variant Image": this.sanitizeImageUrl(images[0]) || ""
+        };
+        this.addMetafields(base, row);
+        shopifyRows.push(base);
       });
+    } else {
+      const sku = this.getMappedValue(row,'sku') || "";
+      const base = {
+        Handle: handle,
+        Title: title,
+        SKU: sku,
+        "Body (HTML)": this.getMappedValue(row,'seo_body') || this.getMappedValue(row,'description') || "",
+        Vendor: this.getMappedValue(row,'vendor') || "House of Sonalii",
+        Type: rowType,
+        Tags: this.generateTags(row),
+        Published: "TRUE",
+        "Option1 Name": "Title",
+        "Option1 Value": "Default Title",
+        "Variant SKU": sku,
+        "Variant Price": price || "",
+        "Variant Compare At Price": compareAt || "",
+        "Variant Inventory Qty": this.getMappedValue(row,'stock') || 0,
+        "Variant Taxable": "TRUE",
+        "Image Src": this.sanitizeImageUrl(images[0]) || "",
+        "Image Position": images.length ? 1 : "",
+        "Variant Image": this.sanitizeImageUrl(images[0]) || ""
+      };
+      this.addMetafields(base, row);
+      shopifyRows.push(base);
+    }
+
+    // Extra images
+    for (let i = 1; i < images.length; i++) {
+      const extra = this.sanitizeImageUrl(images[i]);
+      if (!extra) continue;
+      shopifyRows.push({
+        Handle: handle,
+        "Image Src": extra,
+        "Image Position": i + 1
+      });
+    }
+
+  } catch (err) {
+    console.error(`Row ${index} error:`, err);
+  }
+});
+
   
       this.finalResult = {
         totalProducts: this.mappingResults.totalProducts,

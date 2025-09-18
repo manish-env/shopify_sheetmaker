@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Admin - Shopify Sheetmaker</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { --bg:#0b0c10; --card:#15171d; --muted:#8992a1; --text:#e8eef8; --accent:#4f8cff; --ok:#19c37d; --warn:#f59e0b; }
+    body { margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; background:#0b0c10; color:var(--text); }
+    .container { max-width:680px; margin:40px auto; padding:0 16px; }
+    .card { background:var(--card); border:1px solid #22252e; border-radius:14px; padding:18px; }
+    h1 { font-size:22px; margin:0 0 14px; }
+    label { font-size:12px; color:var(--muted); display:block; margin-bottom:6px; }
+    input[type=text], input[type=password] { width:100%; background:#0f1117; color:var(--text); border:1px solid #262a34; border-radius:10px; padding:10px 12px; }
+    .row { display:flex; gap:10px; }
+    .btn { background:var(--accent); color:#fff; border:none; padding:10px 14px; border-radius:10px; font-weight:600; cursor:pointer; }
+    .btn.secondary { background:#2a2f3a; }
+    .btn.warn { background:var(--warn); color:#111; }
+    .btn.ok { background:var(--ok); color:#111; }
+    .muted { color:var(--muted); }
+    .status { margin-top:10px; font-weight:600; }
+    .mono { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; }
+    .hidden { display:none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card" id="login-card">
+      <h1>Admin Login</h1>
+      <div>
+        <label>Username</label>
+        <input id="username" type="text" placeholder="admin" />
+      </div>
+      <div style="margin-top:10px;">
+        <label>Password</label>
+        <input id="password" type="password" placeholder="••••••" />
+      </div>
+      <div class="row" style="margin-top:12px;">
+        <button id="login-btn" class="btn">Login</button>
+        <a href="index.html" class="btn secondary">Back to App</a>
+      </div>
+      <div id="login-msg" class="muted" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="card hidden" id="admin-card">
+      <h1>Admin Controls</h1>
+      <div class="muted">Toggle access to the sheet generation app. This setting is stored in the browser and applied before the app loads.</div>
+      <div class="row" style="margin-top:12px;">
+        <button id="block-btn" class="btn warn">Block App</button>
+        <button id="unblock-btn" class="btn ok">Unblock App</button>
+        <a href="index.html" class="btn secondary">Open App</a>
+      </div>
+      <div id="status" class="status"></div>
+      <div class="muted" style="margin-top:8px;">Storage key: <span class="mono">sheetmaker:block:v1</span></div>
+      <div class="muted" style="margin-top:6px;">Note: Blocking hides the UI and prevents code from initializing.</div>
+      <div style="margin-top:12px;">
+        <button id="logout-btn" class="btn secondary">Logout</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      var KEY = 'sheetmaker:block:v1';
+      var AUTH_KEY = 'sheetmaker:auth:v1';
+      var USER = 'admin';
+      var PASS = 'sheetmaker@123'; // change as desired
+
+      function setBlocked(blocked){
+        if (blocked) localStorage.setItem(KEY, 'BLOCKED');
+        else localStorage.removeItem(KEY);
+        updateStatus();
+      }
+      function updateStatus(){
+        var s = document.getElementById('status');
+        var blocked = localStorage.getItem(KEY) === 'BLOCKED';
+        s.textContent = blocked ? 'Status: BLOCKED' : 'Status: UNBLOCKED';
+      }
+      function showAdmin(){
+        document.getElementById('login-card').classList.add('hidden');
+        document.getElementById('admin-card').classList.remove('hidden');
+        updateStatus();
+      }
+      function logout(){
+        localStorage.removeItem(AUTH_KEY);
+        location.reload();
+      }
+
+      document.getElementById('login-btn').addEventListener('click', function(){
+        var u = (document.getElementById('username').value || '').trim();
+        var p = document.getElementById('password').value || '';
+        var msg = document.getElementById('login-msg');
+        if (u === USER && p === PASS) {
+          localStorage.setItem(AUTH_KEY, 'OK');
+          showAdmin();
+        } else {
+          msg.textContent = 'Invalid credentials';
+        }
+      });
+
+      document.getElementById('block-btn').addEventListener('click', function(){ setBlocked(true); });
+      document.getElementById('unblock-btn').addEventListener('click', function(){ setBlocked(false); });
+      document.getElementById('logout-btn').addEventListener('click', logout);
+
+      // Auto show admin if already authed
+      if (localStorage.getItem(AUTH_KEY) === 'OK') showAdmin();
+    })();
+  </script>
+</body>
+</html>
+
+
+
